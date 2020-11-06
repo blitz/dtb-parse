@@ -5,6 +5,8 @@ import qualified Data.ByteString as B
 import           Data.FileEmbed  (embedFile)
 import           Test.Hspec
 
+import           Data.Dtb
+
 -- |A flattened device tree describing the ULX3S running SaxonSoc.
 --
 -- See https://github.com/lawrie/saxonsoc-ulx3s-bin
