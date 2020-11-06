@@ -19,6 +19,18 @@ library
   default-language:    Haskell2010
   ghc-options:      -fwarn-unused-imports
 
+test-suite dtb-parse-test
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  other-modules:      ParseSpec
+  hs-source-dirs:     test
+  build-depends:      base
+                    , dtb-parse
+                    , hspec
+  default-language:   Haskell2010
+  build-tool-depends: hspec-discover:hspec-discover
+  ghc-options:        -fwarn-unused-imports
+
 source-repository head
   type:     git
   location: https://github.com/blitz/dtb-parse
