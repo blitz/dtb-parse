@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 module Data.Dtb (Header(..), parseHeader)
 where
 
