@@ -27,6 +27,8 @@ test-suite dtb-parse-test
   build-depends:      base
                     , dtb-parse
                     , hspec
+                    , file-embed
+                    , bytestring
   default-language:   Haskell2010
   build-tool-depends: hspec-discover:hspec-discover
   ghc-options:        -fwarn-unused-imports
