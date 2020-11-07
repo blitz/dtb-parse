@@ -3,6 +3,7 @@ module ParseSpec (spec) where
 
 import qualified Data.ByteString as B
 import           Data.FileEmbed  (embedFile)
+import           Data.Maybe      (isJust)
 import           Test.Hspec
 
 import           Data.Dtb
@@ -15,5 +16,5 @@ dtbFile = $(embedFile "test/ulx3s-green85f.dtb")
 
 spec :: Spec
 spec = describe "parser" $ do
-  it "has no tests yet" $
-    True `shouldBe` True
+  it "recognizes a valid header" $
+    parseHeader dtbFile `shouldSatisfy` isJust
