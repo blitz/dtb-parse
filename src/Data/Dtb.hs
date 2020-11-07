@@ -1,5 +1,5 @@
 {-# LANGUAGE Safe #-}
-module Data.Dtb (Header(..), parseHeader)
+module Data.Dtb (Header(..), parseHeader, stringsBlock, structBlock)
 where
 
 import           Control.Monad        (guard)
@@ -25,6 +25,10 @@ data Header = Header
   }
   deriving (Eq, Show)
 
+type RawDtbData = B.ByteString
+type StringsBlock = B.ByteString
+type StructureBlock = B.ByteString
+
 headerMagic :: Word32
 headerMagic = 0xd00dfeed
 
@@ -49,11 +53,30 @@ isValidHeader header =
   magic header == headerMagic && last_comp_version header `Prelude.elem` headerSupportedVersions
 
 -- |Parse a DTB header from a byte string.
-parseHeader :: B.ByteString -> Maybe Header
+--
+-- Returns `Nothing`, if the header is not recognized as valid.
+parseHeader :: RawDtbData -> Maybe Header
 parseHeader dta = case runGetOrFail headerParser (BL.fromStrict dta) of
   Left (_, _, errorMsg) -> Nothing
   Right (_, _, header)  -> do
     guard $ isValidHeader header
     return header
 
--- Nothing here yet.
+sliceBlock :: Word32 -> Word32 -> RawDtbData -> Maybe B.ByteString
+sliceBlock start size dta = do
+  guard $ B.length block == (fromIntegral size)
+  return block
+  where block = B.take (fromIntegral size)
+                $ B.drop (fromIntegral start) dta
+
+-- |Extract the strings block from a DTB.
+--
+-- This function may fail with `Nothing` if the DTB is malformed.
+stringsBlock :: Header -> RawDtbData -> Maybe StringsBlock
+stringsBlock header = sliceBlock (off_dt_strings header) (size_dt_strings header)
+
+-- |Extract the strings block from a DTB.
+--
+-- This function may fail with `Nothing` if the DTB is malformed.
+structBlock :: Header -> RawDtbData -> Maybe StructureBlock
+structBlock header = sliceBlock (off_dt_struct header) (size_dt_struct header)
