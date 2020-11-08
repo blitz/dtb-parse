@@ -1,13 +1,15 @@
 {-# LANGUAGE Safe #-}
 module Data.Dtb.LowLevel
   (Header(..), MemoryReservation(..),
-    parseHeader, stringsBlock, structBlock, memoryReservations)
+    parseHeader, stringsBlock, structBlock, memoryReservations, extractString)
 where
 
 import           Control.Monad        (guard)
 import           Data.Binary.Get
 import           Data.ByteString      as B
 import           Data.ByteString.Lazy as BL
+import qualified Data.Text            as T
+import qualified Data.Text.Encoding   as E
 import           Data.Word            (Word32, Word64)
 
 -- |The header of a flattened device tree file.
@@ -110,6 +112,17 @@ sliceBlock start size dta = do
 -- This function may fail with `Nothing` if the DTB is malformed.
 stringsBlock :: Header -> RawDtbData -> Maybe StringsBlock
 stringsBlock header = sliceBlock (off_dt_strings header) (size_dt_strings header)
+
+-- |Extract a string from the strings block.
+--
+-- The specification doesn't specify the encoding, so we assume it's
+-- UTF-8. Invalid UTF-8 or invalid offsets will result in `Nothing`.
+extractString :: StringsBlock -> Word32 -> Maybe T.Text
+extractString sb o
+  | fromIntegral o >= B.length sb = Nothing
+  | otherwise =  case E.decodeUtf8' $ B.takeWhile (/= 0) $ B.drop (fromIntegral o) sb of
+                   Left _  -> Nothing
+                   Right t -> Just t
 
 -- |Extract the strings block from a DTB.
 --

@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module ParseSpec (spec) where
 
 import qualified Data.ByteString   as B
@@ -32,3 +33,10 @@ spec = describe "low-level parser" $ do
     memoryReservations (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldBe` Just []
   it "parses memory reservations (RPI4B)" $
     memoryReservations (fromJust $ parseHeader rpi4bDtbFile) rpi4bDtbFile `shouldBe` Just [MemoryReservation 0 0x1000]
+  it "extracts strings" $
+    extractString sb <$> [0, 13, 14] `shouldBe` [Just "#address-cells", Just "s", Just ""]
+  it "rejects invalid offsets in the strings block" $
+    extractString sb 0x1234 `shouldBe` Nothing
+  it "rejects invalid UTF-8 in the strings block" $
+    extractString (B.pack [0xc3, 0x28, 0]) 0 `shouldBe` Nothing
+  where sb = fromJust $ stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
