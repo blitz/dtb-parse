@@ -15,10 +15,12 @@ dtbFile :: B.ByteString
 dtbFile = $(embedFile "test/ulx3s-green85f.dtb")
 
 spec :: Spec
-spec = describe "parser" $ do
+spec = describe "low-level parser" $ do
   it "recognizes a valid header" $
     parseHeader dtbFile `shouldSatisfy` isJust
   it "recognizes a valid strings block" $
     stringsBlock (fromJust $ parseHeader dtbFile) dtbFile `shouldSatisfy` isJust
   it "recognizes a valid struct block" $
     structBlock (fromJust $ parseHeader dtbFile) dtbFile `shouldSatisfy` isJust
+  it "parses memory reservations" $
+    memoryReservations (fromJust $ parseHeader dtbFile) dtbFile `shouldBe` Just []

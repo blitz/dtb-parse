@@ -95,7 +95,7 @@ memoryReservationsParser =
 -- |Return a list of memory reservations from a DTB.
 memoryReservations :: Header -> RawDtbData -> Maybe [MemoryReservation]
 memoryReservations header = runParserOrFail memoryReservationsParser
-                            . B.take (fromIntegral $ off_mem_rsvmap header)
+                            . B.drop (fromIntegral $ off_mem_rsvmap header)
 
 -- |Slice a block out of a byte string given by start and length.
 sliceBlock :: Word32 -> Word32 -> RawDtbData -> Maybe B.ByteString
