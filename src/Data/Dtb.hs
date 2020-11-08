@@ -1,12 +1,13 @@
 {-# LANGUAGE Safe #-}
-module Data.Dtb (Header(..), parseHeader, stringsBlock, structBlock)
+module Data.Dtb (Header(..), MemoryReservation(..),
+                 parseHeader, stringsBlock, structBlock, memoryReservations)
 where
 
 import           Control.Monad        (guard)
 import           Data.Binary.Get
 import           Data.ByteString      as B
 import           Data.ByteString.Lazy as BL
-import           Data.Word            (Word32)
+import           Data.Word            (Word32, Word64)
 
 -- |The header of a flattened device tree file.
 --
@@ -22,6 +23,12 @@ data Header = Header
   , boot_cpuid_phys   :: !Word32
   , size_dt_strings   :: !Word32
   , size_dt_struct    :: !Word32
+  }
+  deriving (Eq, Show)
+
+data MemoryReservation = MemoryReservation
+  { address :: !Word64
+  , size    :: !Word64
   }
   deriving (Eq, Show)
 
@@ -52,16 +59,41 @@ isValidHeader :: Header -> Bool
 isValidHeader header =
   magic header == headerMagic && last_comp_version header `Prelude.elem` headerSupportedVersions
 
+runParserOrFail :: Get a -> B.ByteString -> Maybe a
+runParserOrFail p dta = case runGetOrFail p (BL.fromStrict dta) of
+  Left (_, _, _errorMsg)  -> Nothing
+  Right (_, _, parsedVal) -> Just parsedVal
+
 -- |Parse a DTB header from a byte string.
 --
 -- Returns `Nothing`, if the header is not recognized as valid.
 parseHeader :: RawDtbData -> Maybe Header
-parseHeader dta = case runGetOrFail headerParser (BL.fromStrict dta) of
-  Left (_, _, errorMsg) -> Nothing
-  Right (_, _, header)  -> do
-    guard $ isValidHeader header
-    return header
+parseHeader dta = do
+  header <- runParserOrFail headerParser dta
+  guard $ isValidHeader header
+  return header
 
+memoryReservationParser :: Get MemoryReservation
+memoryReservationParser = MemoryReservation
+                          <$> getWord64be
+                          <*> getWord64be
+
+memoryReservationsParser :: Get [MemoryReservation]
+memoryReservationsParser = do
+  reservation <- memoryReservationParser
+  case reservation of
+    -- Memory reservations are terminated by a special token.
+    MemoryReservation 0 0 -> return []
+    _ -> do
+      rest <- memoryReservationsParser
+      return $ reservation:rest
+
+-- |Return a list of memory reservations from a DTB.
+memoryReservations :: Header -> RawDtbData -> Maybe [MemoryReservation]
+memoryReservations header = runParserOrFail memoryReservationsParser
+                            . B.take (fromIntegral $ off_mem_rsvmap header)
+
+-- |Slice a block out of a byte string given by start and length.
 sliceBlock :: Word32 -> Word32 -> RawDtbData -> Maybe B.ByteString
 sliceBlock start size dta = do
   guard $ B.length block == (fromIntegral size)
