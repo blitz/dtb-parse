@@ -1,12 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 module ParseSpec (spec) where
 
-import qualified Data.ByteString as B
-import           Data.FileEmbed  (embedFile)
-import           Data.Maybe      (fromJust, isJust)
+import qualified Data.ByteString   as B
+import           Data.FileEmbed    (embedFile)
+import           Data.Maybe        (fromJust, isJust)
 import           Test.Hspec
 
-import           Data.Dtb
+import           Data.Dtb.LowLevel
 
 -- |A flattened device tree describing the ULX3S running SaxonSoc.
 --
