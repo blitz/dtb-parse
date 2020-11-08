@@ -79,15 +79,18 @@ memoryReservationParser = MemoryReservation
                           <$> getWord64be
                           <*> getWord64be
 
+-- |Get a list of items by repeatedly applying a parser until an exit
+-- condition is met.
+getDelimitedList :: Get a -> (a -> Bool) -> Get [a]
+getDelimitedList p pred = do
+  it <- p
+  if pred it then return [] else do
+    rest <- getDelimitedList p pred
+    return $ it:rest
+
 memoryReservationsParser :: Get [MemoryReservation]
-memoryReservationsParser = do
-  reservation <- memoryReservationParser
-  case reservation of
-    -- Memory reservations are terminated by a special token.
-    MemoryReservation 0 0 -> return []
-    _ -> do
-      rest <- memoryReservationsParser
-      return $ reservation:rest
+memoryReservationsParser =
+  getDelimitedList memoryReservationParser (== (MemoryReservation 0 0))
 
 -- |Return a list of memory reservations from a DTB.
 memoryReservations :: Header -> RawDtbData -> Maybe [MemoryReservation]
