@@ -11,16 +11,24 @@ import           Data.Dtb.LowLevel
 -- |A flattened device tree describing the ULX3S running SaxonSoc.
 --
 -- See https://github.com/lawrie/saxonsoc-ulx3s-bin
-dtbFile :: B.ByteString
-dtbFile = $(embedFile "test/ulx3s-green85f.dtb")
+ulx3sDtbFile :: B.ByteString
+ulx3sDtbFile = $(embedFile "test/ulx3s-green85f.dtb")
+
+-- |A flattened device tree describing a Raspberry Pi 4B.
+--
+-- See https://github.com/raspberrypi/firmware
+rpi4bDtbFile :: B.ByteString
+rpi4bDtbFile = $(embedFile "test/rpi4b.dtb")
 
 spec :: Spec
 spec = describe "low-level parser" $ do
   it "recognizes a valid header" $
-    parseHeader dtbFile `shouldSatisfy` isJust
+    parseHeader ulx3sDtbFile `shouldSatisfy` isJust
   it "recognizes a valid strings block" $
-    stringsBlock (fromJust $ parseHeader dtbFile) dtbFile `shouldSatisfy` isJust
+    stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldSatisfy` isJust
   it "recognizes a valid struct block" $
-    structBlock (fromJust $ parseHeader dtbFile) dtbFile `shouldSatisfy` isJust
-  it "parses memory reservations" $
-    memoryReservations (fromJust $ parseHeader dtbFile) dtbFile `shouldBe` Just []
+    structBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldSatisfy` isJust
+  it "parses memory reservations (ULX3S)" $
+    memoryReservations (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldBe` Just []
+  it "parses memory reservations (RPI4B)" $
+    memoryReservations (fromJust $ parseHeader rpi4bDtbFile) rpi4bDtbFile `shouldBe` Just [MemoryReservation 0 0x1000]
