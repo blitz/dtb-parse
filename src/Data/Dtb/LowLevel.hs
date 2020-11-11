@@ -1,16 +1,18 @@
 {-# LANGUAGE Safe #-}
 module Data.Dtb.LowLevel
-  (Header(..), MemoryReservation(..),
-    parseHeader, stringsBlock, structBlock, memoryReservations, extractString)
+  (Header(..), MemoryReservation(..), Token(..), PropData,
+    parseHeader, stringsBlock, structBlock, memoryReservations, extractString,
+    deviceTreeTokens)
 where
 
-import           Control.Monad        (guard)
+import           Control.Monad            (guard, void)
 import           Data.Binary.Get
-import           Data.ByteString      as B
-import           Data.ByteString.Lazy as BL
-import qualified Data.Text            as T
-import qualified Data.Text.Encoding   as E
-import           Data.Word            (Word32, Word64)
+import           Data.ByteString          as B
+import           Data.ByteString.Lazy     as BL
+import qualified Data.Text                as T
+import qualified Data.Text.Encoding       as E
+import qualified Data.Text.Encoding.Error as E
+import           Data.Word                (Word32, Word64)
 
 -- |The header of a flattened device tree file.
 --
@@ -62,6 +64,8 @@ isValidHeader :: Header -> Bool
 isValidHeader header =
   magic header == headerMagic && last_comp_version header `Prelude.elem` headerSupportedVersions
 
+-- TODO There is also the binary-strict package, which should handle
+-- strict bytestrings.
 runParserOrFail :: Get a -> B.ByteString -> Maybe a
 runParserOrFail p dta = case runGetOrFail p (BL.fromStrict dta) of
   Left (_, _, _errorMsg)  -> Nothing
@@ -129,3 +133,56 @@ extractString sb o
 -- This function may fail with `Nothing` if the DTB is malformed.
 structBlock :: Header -> RawDtbData -> Maybe StructureBlock
 structBlock header = sliceBlock (off_dt_struct header) (size_dt_struct header)
+
+type PropData = B.ByteString
+
+data Token = BeginNode T.Text
+           | EndNode
+           | Prop T.Text PropData
+           | Nop
+           | End
+  deriving (Eq, Show, Ord)
+
+-- |Parse a zero-terminated string.
+--
+-- This parser makes sure that a 32-bit aligned chunk of input is
+-- consumed.
+alignedStringParser :: Get T.Text
+alignedStringParser = do
+  string <- getDelimitedList getWord8 (== 0)
+  void $ getByteString $ 3 - (Prelude.length string `mod` 4)
+  return $ E.decodeUtf8With E.lenientDecode $ B.pack string
+
+beginNodeParser :: Get Token
+beginNodeParser = BeginNode <$> alignedStringParser
+
+propParser :: StringsBlock -> Get Token
+propParser sb = do
+  len <- getWord32be
+  nameoff <- getWord32be
+  payload <- getByteString $ fromIntegral len
+  void $ getByteString $ fromIntegral $ (4 - (len `mod` 4)) `mod` 4
+  case extractString sb nameoff of
+    Just name -> return $ Prop name payload
+    Nothing   -> fail "invalid name offset"
+
+tokenParser :: StringsBlock -> Get Token
+tokenParser strs = do
+  tokenType <- getWord32be
+  case tokenType of
+    0x1 -> beginNodeParser
+    0x3 -> propParser strs
+    0x2 -> return $ EndNode
+    0x4 -> return $ Nop
+    0x9 -> return $ End
+    _   -> fail "Invalid token type"
+
+tokensParser :: StringsBlock -> Get [Token]
+tokensParser sb = do
+  l <- getDelimitedList (tokenParser sb) (== End)
+  return $ l ++ [End]
+
+-- |Parse the structure block of the device tree into individual
+-- tokens.
+deviceTreeTokens :: StringsBlock -> StructureBlock -> Maybe [Token]
+deviceTreeTokens = runParserOrFail . tokensParser

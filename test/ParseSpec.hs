@@ -8,6 +8,7 @@ import           Data.Maybe        (fromJust, isJust)
 import           Test.Hspec
 
 import           Data.Dtb.LowLevel
+import           Data.Dtb.Parser
 
 -- |A flattened device tree describing the ULX3S running SaxonSoc.
 --
@@ -39,4 +40,13 @@ spec = describe "low-level parser" $ do
     extractString sb 0x1234 `shouldBe` Nothing
   it "rejects invalid UTF-8 in the strings block" $
     extractString (B.pack [0xc3, 0x28, 0]) 0 `shouldBe` Nothing
+  it "tokenizes a token stream (1)" $
+    fromJust (deviceTreeTokens sb stb) `shouldStartWith` [BeginNode ""]
+  it "tokenizes a token stream (2)" $
+    fromJust (deviceTreeTokens sb stb) `shouldEndWith` [End]
+  it "parses a token stream" $
+    fromJust (parse (fromJust $ deviceTreeTokens sb stb)) `shouldSatisfy` isSaneDeviceTree
   where sb = fromJust $ stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
+        stb = fromJust $ structBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
+        isSaneDeviceTree (Node "" props children) = True
+        isSaneDeviceTree _                        = False
