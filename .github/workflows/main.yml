@@ -1,15 +1,23 @@
 on: [push, pull_request]
 name: build
 jobs:
-  runhaskell:
-    name: Run Tests
+  teststack:
+    name: Run Tests (Stack)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-haskell@v1.1.3
         with:
           ghc-version: 'latest'
-          # cabal-version: 'latest'. Omitted, but defaults to 'latest'
           enable-stack: true
           stack-version: 'latest'
       - run: stack test
+  testcabal:
+    name: Run Tests (Cabal)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-haskell@v1.1.3
+        with:
+          ghc-version: 'latest'
+      - run: cabal test
