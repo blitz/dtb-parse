@@ -58,9 +58,8 @@ spec = describe "low-level parser" $ do
 
   it "looks up existing paths with aliases" $
     lookupNode "/ethernet0" <$> parseDtb rpi4bDtbFile `shouldBe` lookupNode "/scb/ethernet@7d580000" <$> parseDtb rpi4bDtbFile
-  -- TODO Not implemented yet.
-  -- it "looks up paths without unit addresses in unambiguous cases" $
-  --   lookupNode "/scb/ethernet" <$> parseDtb rpi4bDtbFile `shouldBe` lookupNode "/scb/ethernet@7d580000" <$> parseDtb rpi4bDtbFile
+  it "looks up paths without unit addresses in unambiguous cases" $
+    lookupNode "/scb/ethernet" <$> parseDtb rpi4bDtbFile `shouldBe` lookupNode "/scb/ethernet@7d580000" <$> parseDtb rpi4bDtbFile
 
   it "looks up string properties" $
     ((parseDtb rpi4bDtbFile
