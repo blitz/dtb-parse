@@ -3,6 +3,7 @@ module Data.Dtb
   (Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..)
   , parseDtb
   , lookupNode
+  , lookupProperty
   , rootNode
   , asText
   )
@@ -12,6 +13,7 @@ import qualified Data.ByteString   as B
 import           Data.Dtb.LowLevel
 import           Data.Dtb.Parser
 import           Data.Dtb.Property
+import           Data.Foldable     (find)
 import           Data.Maybe        (catMaybes, listToMaybe)
 import qualified Data.Text         as T
 
@@ -58,5 +60,9 @@ lookupNodeByPath (p:ps) n@(Node name _ children)
 -- The path is a string like "/cpus/cpu@0". This function currently
 -- does NOT support aliases.
 lookupNode :: T.Text -> Dtb -> Maybe DeviceTree
-lookupNode name (Dtb _ n) = lookupNodeByPath path n
-  where path = toPath name
+lookupNode name (Dtb _ n) = lookupNodeByPath (toPath name) n
+
+-- |Find a property with the given name in the property list of a
+-- node.
+lookupProperty :: T.Text -> DeviceTree -> Maybe Property
+lookupProperty name (Node _ props _) = find ((== name) . propName) props
