@@ -7,6 +7,7 @@ import           Data.FileEmbed    (embedFile)
 import           Data.Maybe        (fromJust, isJust)
 import           Test.Hspec
 
+import           Data.Dtb
 import           Data.Dtb.LowLevel
 import           Data.Dtb.Parser
 
@@ -46,6 +47,14 @@ spec = describe "low-level parser" $ do
     fromJust (deviceTreeTokens sb stb) `shouldEndWith` [End]
   it "parses a token stream" $
     fromJust (parse (fromJust $ deviceTreeTokens sb stb)) `shouldSatisfy` isSaneDeviceTree
+
+  it "looks up the root node" $
+    lookupNode "/" <$> parseDtb ulx3sDtbFile `shouldBe` Just <$> rootNode <$> parseDtb ulx3sDtbFile
+  it "doesn't lookup non-existing paths" $
+    lookupNode "/cpus/cxxpu@0" <$> parseDtb ulx3sDtbFile `shouldBe` Just Nothing
+  it "looks up existing paths without aliases" $
+    lookupNode "/cpus/cpu@0" <$> parseDtb ulx3sDtbFile `shouldSatisfy` isJust
+
   where sb = fromJust $ stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
         stb = fromJust $ structBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
         isSaneDeviceTree (Node "" props children) = True

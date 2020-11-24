@@ -1,16 +1,14 @@
 {-# LANGUAGE TypeFamilies #-}
 module Data.Dtb.Parser
-  (Property(..), DeviceTree(..), parse)
+  (DeviceTree(..), parse)
 where
 
 import qualified Data.Dtb.LowLevel as D
+import           Data.Dtb.Property
 import qualified Data.Set          as E
 import qualified Data.Text         as T
 import           Data.Void         (Void)
 import qualified Text.Megaparsec   as P
-
-data Property = Property !T.Text !D.PropData
-  deriving (Show, Eq)
 
 data DeviceTree = Node !T.Text [Property] [DeviceTree]
   deriving (Show, Eq)

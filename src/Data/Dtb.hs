@@ -1,10 +1,19 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Data.Dtb
-  (parseDtb, Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..))
+  (Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..)
+  , parseDtb
+  , lookupNode
+  , rootNode
+  , asText
+  )
 where
 
-import           Data.ByteString   as B
+import qualified Data.ByteString   as B
 import           Data.Dtb.LowLevel
 import           Data.Dtb.Parser
+import           Data.Dtb.Property
+import           Data.Maybe        (catMaybes, listToMaybe)
+import qualified Data.Text         as T
 
 -- |The representation of a device tree.
 --
@@ -25,3 +34,29 @@ parseDtb dta = do
   tokens <- deviceTreeTokens sb stb
   tree <- parse tokens
   return $ Dtb memRsv tree
+
+-- |Returns the root node of the device tree.
+rootNode :: Dtb -> DeviceTree
+rootNode (Dtb _ n) = n
+
+-- |Split a path into its components.
+toPath :: T.Text -> [T.Text]
+toPath p = if split == ["", ""] then [""] else split
+  -- "/" is split into two empty strings. We want [""] instead.
+  where split = T.splitOn "/" $ if T.isPrefixOf "/" p then p else "/" <> p
+
+lookupNodeByPath :: [T.Text] -> DeviceTree -> Maybe DeviceTree
+lookupNodeByPath [] n = Nothing
+lookupNodeByPath (p:ps) n@(Node name _ children)
+  | p == name = case ps of
+      [] -> Just n
+      _  -> listToMaybe $ catMaybes $ lookupNodeByPath ps <$> children
+  | otherwise = Nothing
+
+-- |Look up a property in the device tree using its path.
+--
+-- The path is a string like "/cpus/cpu@0". This function currently
+-- does NOT support aliases.
+lookupNode :: T.Text -> Dtb -> Maybe DeviceTree
+lookupNode name (Dtb _ n) = lookupNodeByPath path n
+  where path = toPath name

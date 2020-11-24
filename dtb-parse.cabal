@@ -19,6 +19,7 @@ library
   exposed-modules:  Data.Dtb
                     Data.Dtb.LowLevel
                     Data.Dtb.Parser
+                    Data.Dtb.Property
   hs-source-dirs:   src
   build-depends:    base       >= 4.13.0 && < 4.15
                   , binary     >= 0.8.7 && < 0.9
