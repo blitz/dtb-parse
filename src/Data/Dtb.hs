@@ -27,8 +27,8 @@ data Dtb = Dtb [MemoryReservation] DeviceTree
 
 -- |Parses a device tree from a `ByteString`.
 --
--- Returns Nothing on failure.
-parseDtb :: B.ByteString -> Maybe Dtb
+-- Returns an error message on failure.
+parseDtb :: B.ByteString -> Either T.Text Dtb
 parseDtb dta = do
   header <- parseHeader dta
   memRsv <- memoryReservations header dta

@@ -2,10 +2,10 @@
 {-# LANGUAGE TemplateHaskell   #-}
 module ParseSpec (spec) where
 
-import qualified Data.ByteString   as B
-import           Data.FileEmbed    (embedFile)
-import           Data.Functor
-import           Data.Maybe        (fromJust, isJust)
+import qualified Data.ByteString         as B
+import           Data.Either             (fromRight, isLeft, isRight)
+import           Data.Either.Combinators (rightToMaybe)
+import           Data.FileEmbed          (embedFile)
 import           Test.Hspec
 
 import           Data.Dtb
@@ -27,34 +27,34 @@ rpi4bDtbFile = $(embedFile "test/rpi4b.dtb")
 spec :: Spec
 spec = describe "low-level parser" $ do
   it "recognizes a valid header" $
-    parseHeader ulx3sDtbFile `shouldSatisfy` isJust
+    parseHeader ulx3sDtbFile `shouldSatisfy` isRight
   it "recognizes a valid strings block" $
-    stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldSatisfy` isJust
+    stringsBlock ulx3sHeader ulx3sDtbFile `shouldSatisfy` isRight
   it "recognizes a valid struct block" $
-    structBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldSatisfy` isJust
+    structBlock ulx3sHeader ulx3sDtbFile `shouldSatisfy` isRight
   it "parses memory reservations (ULX3S)" $
-    memoryReservations (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile `shouldBe` Just []
+    memoryReservations ulx3sHeader ulx3sDtbFile `shouldBe` Right []
   it "parses memory reservations (RPI4B)" $
-    memoryReservations (fromJust $ parseHeader rpi4bDtbFile) rpi4bDtbFile `shouldBe` Just [MemoryReservation 0 0x1000]
+    memoryReservations rpi4bHeader rpi4bDtbFile `shouldBe` Right [MemoryReservation 0 0x1000]
   it "extracts strings" $
-    extractString sb <$> [0, 13, 14] `shouldBe` [Just "#address-cells", Just "s", Just ""]
+    extractString sb <$> [0, 13, 14] `shouldBe` [Right "#address-cells", Right "s", Right ""]
   it "rejects invalid offsets in the strings block" $
-    extractString sb 0x1234 `shouldBe` Nothing
+    extractString sb 0x1234 `shouldSatisfy` isLeft
   it "rejects invalid UTF-8 in the strings block" $
-    extractString (B.pack [0xc3, 0x28, 0]) 0 `shouldBe` Nothing
+    extractString (B.pack [0xc3, 0x28, 0]) 0 `shouldSatisfy` isLeft
   it "tokenizes a token stream (1)" $
-    fromJust (deviceTreeTokens sb stb) `shouldStartWith` [BeginNode ""]
+    fromRight (error "tokens") (deviceTreeTokens sb stb) `shouldStartWith` [BeginNode ""]
   it "tokenizes a token stream (2)" $
-    fromJust (deviceTreeTokens sb stb) `shouldEndWith` [End]
+    fromRight (error "tokens") (deviceTreeTokens sb stb) `shouldEndWith` [End]
   it "parses a token stream" $
-    fromJust (parse (fromJust $ deviceTreeTokens sb stb)) `shouldSatisfy` isSaneDeviceTree
+    fromRight (error "parse") (parse (fromRight (error "tokens") $ deviceTreeTokens sb stb)) `shouldSatisfy` isSaneDeviceTree
 
   it "looks up the root node" $
     lookupNode "/" <$> parseDtb ulx3sDtbFile `shouldBe` Just <$> rootNode <$> parseDtb ulx3sDtbFile
   it "doesn't lookup non-existing paths" $
-    lookupNode "/cpus/cxxpu@0" <$> parseDtb ulx3sDtbFile `shouldBe` Just Nothing
+    lookupNode "/cpus/cxxpu@0" <$> parseDtb ulx3sDtbFile `shouldBe` Right Nothing
   it "looks up existing paths without aliases" $
-    lookupNode "/cpus/cpu@0" <$> parseDtb ulx3sDtbFile `shouldSatisfy` isJust . fromJust
+    lookupNode "/cpus/cpu@0" <$> parseDtb ulx3sDtbFile `shouldSatisfy` isRight
 
   it "looks up existing paths with aliases" $
     lookupNode "/ethernet0" <$> parseDtb rpi4bDtbFile `shouldBe` lookupNode "/scb/ethernet@7d580000" <$> parseDtb rpi4bDtbFile
@@ -62,11 +62,18 @@ spec = describe "low-level parser" $ do
     lookupNode "/scb/ethernet" <$> parseDtb rpi4bDtbFile `shouldBe` lookupNode "/scb/ethernet@7d580000" <$> parseDtb rpi4bDtbFile
 
   it "looks up string properties" $
-    ((parseDtb rpi4bDtbFile
-      >>= lookupNode "/scb/ethernet@7d580000"
-      >>= lookupProperty "phy-mode") <&> asText) `shouldBe` Just "rgmii-rxid"
+    (do
+         dtb <- rightToMaybe $ parseDtb rpi4bDtbFile
+         node <- lookupNode "/scb/ethernet@7d580000" dtb
+         prop <- lookupProperty "phy-mode" node
+         return $ asText prop) `shouldBe` Just "rgmii-rxid"
 
-  where sb = fromJust $ stringsBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
-        stb = fromJust $ structBlock (fromJust $ parseHeader ulx3sDtbFile) ulx3sDtbFile
-        isSaneDeviceTree (Node "" props children) = True
-        isSaneDeviceTree _                        = False
+  where
+    ulx3sHeader :: Header
+    ulx3sHeader = fromRight (error "parseHeader failed") $ parseHeader ulx3sDtbFile
+    rpi4bHeader :: Header
+    rpi4bHeader = fromRight (error "parseHeader failed") $ parseHeader rpi4bDtbFile
+    sb = fromRight (error "stringsBlock") $ stringsBlock ulx3sHeader ulx3sDtbFile
+    stb = fromRight (error "structBlock") $ structBlock ulx3sHeader ulx3sDtbFile
+    isSaneDeviceTree (Node "" props children) = True
+    isSaneDeviceTree _                        = False

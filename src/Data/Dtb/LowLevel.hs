@@ -1,11 +1,12 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Safe              #-}
 module Data.Dtb.LowLevel
   (Header(..), MemoryReservation(..), Token(..), PropData,
     parseHeader, stringsBlock, structBlock, memoryReservations, extractString,
     deviceTreeTokens)
 where
 
-import           Control.Monad            (guard, void)
+import           Control.Monad            (void)
 import           Data.Binary.Get
 import           Data.ByteString          as B
 import           Data.ByteString.Lazy     as BL
@@ -66,19 +67,18 @@ isValidHeader header =
 
 -- TODO There is also the binary-strict package, which should handle
 -- strict bytestrings.
-runParserOrFail :: Get a -> B.ByteString -> Maybe a
+runParserOrFail :: Get a -> B.ByteString -> Either T.Text a
 runParserOrFail p dta = case runGetOrFail p (BL.fromStrict dta) of
-  Left (_, _, _errorMsg)  -> Nothing
-  Right (_, _, parsedVal) -> Just parsedVal
+  Left (_, _, errorMsg)   -> Left $ T.pack errorMsg
+  Right (_, _, parsedVal) -> Right parsedVal
 
 -- |Parse a DTB header from a byte string.
 --
 -- Returns `Nothing`, if the header is not recognized as valid.
-parseHeader :: RawDtbData -> Maybe Header
+parseHeader :: RawDtbData -> Either T.Text Header
 parseHeader dta = do
   header <- runParserOrFail headerParser dta
-  guard $ isValidHeader header
-  return header
+  if isValidHeader header then return header else Left "Invalid Header"
 
 memoryReservationParser :: Get MemoryReservation
 memoryReservationParser = MemoryReservation
@@ -99,39 +99,38 @@ memoryReservationsParser =
   getDelimitedList memoryReservationParser (== (MemoryReservation 0 0))
 
 -- |Return a list of memory reservations from a DTB.
-memoryReservations :: Header -> RawDtbData -> Maybe [MemoryReservation]
+memoryReservations :: Header -> RawDtbData -> Either T.Text [MemoryReservation]
 memoryReservations header = runParserOrFail memoryReservationsParser
                             . B.drop (fromIntegral $ off_mem_rsvmap header)
 
 -- |Slice a block out of a byte string given by start and length.
-sliceBlock :: Word32 -> Word32 -> RawDtbData -> Maybe B.ByteString
+sliceBlock :: Word32 -> Word32 -> RawDtbData -> Either T.Text B.ByteString
 sliceBlock start size dta = do
-  guard $ B.length block == (fromIntegral size)
-  return block
+  if B.length block == (fromIntegral size) then return block else Left "Invalid block slice"
   where block = B.take (fromIntegral size)
                 $ B.drop (fromIntegral start) dta
 
 -- |Extract the strings block from a DTB.
 --
 -- This function may fail with `Nothing` if the DTB is malformed.
-stringsBlock :: Header -> RawDtbData -> Maybe StringsBlock
+stringsBlock :: Header -> RawDtbData -> Either T.Text StringsBlock
 stringsBlock header = sliceBlock (off_dt_strings header) (size_dt_strings header)
 
 -- |Extract a string from the strings block.
 --
 -- The specification doesn't specify the encoding, so we assume it's
 -- UTF-8. Invalid UTF-8 or invalid offsets will result in `Nothing`.
-extractString :: StringsBlock -> Word32 -> Maybe T.Text
+extractString :: StringsBlock -> Word32 -> Either T.Text T.Text
 extractString sb o
-  | fromIntegral o >= B.length sb = Nothing
-  | otherwise =  case E.decodeUtf8' $ B.takeWhile (/= 0) $ B.drop (fromIntegral o) sb of
-                   Left _  -> Nothing
-                   Right t -> Just t
+  | fromIntegral o >= B.length sb = Left "Invalid index into strings block"
+  | otherwise = case E.decodeUtf8' $ B.takeWhile (/= 0) $ B.drop (fromIntegral o) sb of
+                  Left err -> Left $ T.pack $ show err
+                  Right t  -> Right t
 
 -- |Extract the strings block from a DTB.
 --
 -- This function may fail with `Nothing` if the DTB is malformed.
-structBlock :: Header -> RawDtbData -> Maybe StructureBlock
+structBlock :: Header -> RawDtbData -> Either T.Text StructureBlock
 structBlock header = sliceBlock (off_dt_struct header) (size_dt_struct header)
 
 type PropData = B.ByteString
@@ -163,8 +162,8 @@ propParser sb = do
   payload <- getByteString $ fromIntegral len
   void $ getByteString $ fromIntegral $ (4 - (len `mod` 4)) `mod` 4
   case extractString sb nameoff of
-    Just name -> return $ Prop name payload
-    Nothing   -> fail "invalid name offset"
+    Left err   -> fail $ T.unpack err
+    Right name -> return $ Prop name payload
 
 tokenParser :: StringsBlock -> Get Token
 tokenParser strs = do
@@ -184,5 +183,5 @@ tokensParser sb = do
 
 -- |Parse the structure block of the device tree into individual
 -- tokens.
-deviceTreeTokens :: StringsBlock -> StructureBlock -> Maybe [Token]
+deviceTreeTokens :: StringsBlock -> StructureBlock -> Either T.Text [Token]
 deviceTreeTokens = runParserOrFail . tokensParser

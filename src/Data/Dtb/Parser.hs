@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies      #-}
 module Data.Dtb.Parser
   (DeviceTree(..), parse)
 where
@@ -41,5 +42,10 @@ deviceTreeParser = do
   P.eof
   return rootNode
 
-parse :: [D.Token] -> Maybe DeviceTree
-parse = P.parseMaybe deviceTreeParser
+parse :: [D.Token] -> Either T.Text DeviceTree
+parse ts = case P.parseMaybe deviceTreeParser ts of
+             -- TODO We can use P.parse here, return Either and give a
+             -- real error message, if we sort out what instances we
+             -- have to implement to make megaparsec happy.
+             Nothing   -> Left "failed to parse device tree structure"
+             Just tree -> Right tree
