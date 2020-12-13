@@ -10,6 +10,8 @@ maintainer:         js@alien8.de
 homepage:           https://github.com/blitz/dtb-parse#readme
 build-type:         Simple
 extra-source-files: README.md
+                  , test/ulx3s-green85f.dtb
+                  , test/rpi4b.dtb
 cabal-version:      >= 1.10
 
 source-repository head
