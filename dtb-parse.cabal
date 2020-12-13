@@ -1,7 +1,8 @@
 name:               dtb-parse
 version:            0.0.1
 synopsis:           Flattened Device Tree (DTB) Parsing
-license:            LGPL-3.0
+category:           Data
+license:            LGPL-3
 license-file:       LICENSE
 copyright:          Copyright (c) 2020 Julian Stecklina
 author:             Julian Stecklina
