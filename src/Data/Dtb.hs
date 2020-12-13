@@ -5,7 +5,12 @@ module Data.Dtb
   , lookupNode
   , lookupProperty
   , rootNode
+  , reservedMemory
+  , addressSizeCells
   , asText
+  , asWord32
+  , asWord64
+  , asRegList
   )
 where
 
@@ -17,6 +22,7 @@ import           Data.Foldable     (find)
 import           Data.List         (isPrefixOf)
 import           Data.Maybe        (catMaybes, isJust, listToMaybe)
 import qualified Data.Text         as T
+import           Data.Word         (Word32)
 
 -- |The representation of a device tree.
 --
@@ -24,6 +30,7 @@ import qualified Data.Text         as T
 -- are represented using a list. Everything else exists as a
 -- `DeviceTree` tree.
 data Dtb = Dtb [MemoryReservation] DeviceTree
+  deriving (Show)
 
 -- |Parses a device tree from a `ByteString`.
 --
@@ -41,6 +48,9 @@ parseDtb dta = do
 -- |Returns the root node of the device tree.
 rootNode :: Dtb -> DeviceTree
 rootNode (Dtb _ n) = n
+
+reservedMemory :: Dtb -> [MemoryReservation]
+reservedMemory (Dtb m _) = m
 
 -- |A list of node names is a path through the tree.
 type Path = [T.Text]
@@ -110,15 +120,45 @@ resolveAliases aliases path = case find (\(a, _) -> isPrefixOf ["", a] path) ali
   Just (_, replacement) -> replacement ++ drop 2 path
   Nothing               -> path
 
+-- |Convert a textual path to a path structure.
+--
+-- This function also resolves aliases.
+resolvePath :: T.Text -> Dtb -> Path
+resolvePath name dtb = resolveAliases (aliases dtb) $ toPath name
+
 -- |Look up a property in the device tree using its path.
 --
 -- The path is a string like "/cpus/cpu@0". This function currently
 -- does NOT support aliases.
 lookupNode :: T.Text -> Dtb -> Maybe DeviceTree
-lookupNode name dtb@(Dtb _ n) = lookupNodeByPath resolvedPath n
-  where resolvedPath = resolveAliases (aliases dtb) $ toPath name
+lookupNode name dtb@(Dtb _ n) = lookupNodeByPath (resolvePath name dtb) n
 
 -- |Find a property with the given name in the property list of a
 -- node.
 lookupProperty :: T.Text -> DeviceTree -> Maybe Property
 lookupProperty name (Node _ props _) = find ((== name) . propName) props
+
+dropLast :: [a] -> [a]
+dropLast []     = error "Cannot drop last element from empty list"
+dropLast (_:[]) = []
+dropLast (x:xs) = x:(dropLast xs)
+
+-- |Returns the #address-cells and #size-cells properties of a
+-- node.
+--
+-- If the node doesn't have the required properties the tree is
+-- traversed upwards to the first node that has them.
+--
+-- This function can be used together with `asRegList` to parse
+-- resource lists.
+addressSizeCells :: T.Text -> Dtb -> Maybe (Word32, Word32)
+addressSizeCells name dtb@(Dtb _ n) = descend path
+  where
+    descend :: Path -> Maybe (Word32, Word32)
+    descend [] = Nothing
+    descend path = case lookupNodeByPath path n >>= addressSizeCellsExact of
+      Just addrSize -> Just addrSize
+      Nothing       -> descend $ dropLast path
+    path = resolvePath name dtb
+    addressSizeCellsExact dtb' =  (,) <$> propAsWord32 dtb' "#address-cells" <*> propAsWord32 dtb' "#size-cells"
+    propAsWord32 t name = lookupProperty name t >>= asWord32

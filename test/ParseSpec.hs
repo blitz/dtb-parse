@@ -68,11 +68,31 @@ spec = describe "low-level parser" $ do
          prop <- lookupProperty "phy-mode" node
          return $ asText prop) `shouldBe` Just "rgmii-rxid"
 
+  it "looks up resource lists (32-bit)" $
+    (do
+        addrSize <- addressSizeCells "/framebuffer" ulx3sDtb
+        fb <- lookupNode "/framebuffer" ulx3sDtb
+        prop <- lookupProperty "reg" fb
+        asRegList addrSize prop) `shouldBe` Just [(0x80e00000, 0x96000)]
+
+  it "looks up resource lists (64-bit)" $
+    (do
+        addrSize <- addressSizeCells "/v3dbus/v3d" rpi4bDtb
+        fb <- lookupNode "/v3dbus/v3d" rpi4bDtb
+        prop <- lookupProperty "reg" fb
+        asRegList addrSize prop) `shouldBe` Just [(0x7ec00000, 0x4000),
+                                                  (0x7ec04000, 0x4000)]
+
+
   where
     ulx3sHeader :: Header
     ulx3sHeader = fromRight (error "parseHeader failed") $ parseHeader ulx3sDtbFile
+    ulx3sDtb = fromRight (error "parseDtb failed") $ parseDtb ulx3sDtbFile
+
     rpi4bHeader :: Header
     rpi4bHeader = fromRight (error "parseHeader failed") $ parseHeader rpi4bDtbFile
+    rpi4bDtb = fromRight (error "parseDtb failed") $ parseDtb rpi4bDtbFile
+
     sb = fromRight (error "stringsBlock") $ stringsBlock ulx3sHeader ulx3sDtbFile
     stb = fromRight (error "structBlock") $ structBlock ulx3sHeader ulx3sDtbFile
     isSaneDeviceTree (Node "" props children) = True
