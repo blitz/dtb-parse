@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies      #-}
 module Data.Dtb.Parser
-  (DeviceTree(..), parse)
+  (DeviceTree(..), properties, children, parse)
 where
 
 import qualified Data.Dtb.LowLevel as D
@@ -15,6 +15,12 @@ data DeviceTree = Node !T.Text [Property] [DeviceTree]
   deriving (Show, Eq)
 
 type Parser = P.Parsec Void [D.Token]
+
+properties :: DeviceTree -> [Property]
+properties (Node _ p _) = p
+
+children :: DeviceTree -> [DeviceTree]
+children (Node _ _ c) = c
 
 beginNodeName :: D.Token -> Maybe T.Text
 beginNodeName (D.BeginNode n) = Just n

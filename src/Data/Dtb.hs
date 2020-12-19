@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Data.Dtb
   (Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..)
+  , properties
+  , children
   , parseDtb
   , matchesPath
   , lookupNode
