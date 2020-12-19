@@ -2,6 +2,7 @@
 module Data.Dtb
   (Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..)
   , parseDtb
+  , matchesPath
   , lookupNode
   , lookupProperty
   , rootNode
@@ -78,13 +79,12 @@ matchesNames (a, Nothing) (b, _) = a == b
 matchesNames (a, _) (b, Nothing) = a == b
 matchesNames a b                 = a == b
 
--- |Check whether a name matches a
+-- |Check whether a name matches a device tree node.
 matchesPath :: T.Text -> DeviceTree -> Bool
 matchesPath p (Node name _ _) = matchesNames splitP splitN
   where
     splitP = splitName p
     splitN = splitName name
-
 
 -- |Look up a device tree node by its path.
 --
