@@ -1,6 +1,2 @@
-let
-  haskell = import ./haskell.nix {};
-in
-{
-  inherit (haskell.dtb-parse.components) all;
-}
+let haskell = import ./haskell.nix { };
+in haskell.dtb-parse.components.tests
