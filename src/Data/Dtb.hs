@@ -3,6 +3,8 @@ module Data.Dtb
   (Dtb(..), MemoryReservation(..), Property(..), DeviceTree(..)
   , properties
   , children
+  , propName
+  , propData
   , parseDtb
   , matchesPath
   , lookupNode
